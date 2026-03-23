@@ -1791,6 +1791,10 @@ void update_media_popup() {
 void create_media_player_popover(GtkWidget* btn) {
     global_media_popover = gtk_popover_new(btn);
     gtk_popover_set_position(GTK_POPOVER(global_media_popover), GTK_POS_BOTTOM);
+
+    // When the popover is destroyed (tab closed), clear the global pointer
+    // so the refresh timer doesn't call gtk_widget_get_visible on dead memory.
+    g_object_add_weak_pointer(G_OBJECT(global_media_popover), (gpointer*)&global_media_popover);
     
     GtkWidget* outer_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
     gtk_widget_set_size_request(outer_box, 300, 150); 

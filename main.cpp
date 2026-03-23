@@ -20,14 +20,14 @@ static gboolean memory_trim_timer(gpointer) {
 }
 
 static gboolean refresh_media_popup_timer(gpointer) {
-    if (global_media_popover && gtk_widget_get_visible(global_media_popover)) {
+    if (global_media_popover && GTK_IS_WIDGET(global_media_popover) && gtk_widget_get_visible(global_media_popover)) {
         update_media_popup();
     }
     return TRUE; 
 }
 
 static gboolean refresh_download_popup_timer(gpointer) {
-    if (global_downloads_popover && gtk_widget_get_visible(global_downloads_popover)) {
+    if (global_downloads_popover && GTK_IS_WIDGET(global_downloads_popover) && gtk_widget_get_visible(global_downloads_popover)) {
         update_downloads_popup();
     }
     return TRUE; 
@@ -85,13 +85,6 @@ int main(int argc, char** argv) {
         WEBKIT_CACHE_MODEL_WEB_BROWSER : WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER;
     webkit_web_context_set_cache_model(global_context, model);
 
-    // Share one renderer process across all tabs instead of spawning a new
-    // ~150MB process per tab. Trade-off: a crashed tab can affect others,
-    // but for a personal browser the memory savings far outweigh this.
-    webkit_web_context_set_process_model(global_context, WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS);
-
-    // Hard cap as a safety net if the shared model is ever changed back
-    webkit_web_context_set_web_process_count_limit(global_context, 4);
 
     std::string extension_dir = get_self_path() + "/lib";
     webkit_web_context_set_web_extensions_directory(global_context, extension_dir.c_str());
