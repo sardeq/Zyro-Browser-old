@@ -13,6 +13,10 @@
 #include <fstream>
 #include <iomanip>
 
+#ifdef __linux__
+#include <malloc.h>
+#endif
+
 static std::vector<std::string> closed_tabs_history;
 static std::vector<std::string> last_session_urls; 
 
@@ -868,6 +872,12 @@ void close_tab_with_history(GtkWidget* widget, GtkNotebook* nb, int page_num) {
     
     gtk_notebook_remove_page(nb, page_num);
     if (gtk_notebook_get_n_pages(nb) == 0) gtk_widget_destroy(widget);
+
+#ifdef __linux__
+    // Reclaim freed memory back to the OS immediately after a tab closes.
+    // Without this, glibc holds onto freed heap memory speculatively.
+    malloc_trim(0);
+#endif
 }
 
 static void on_tab_close(GtkButton*, gpointer v_box_widget) { 
@@ -1106,35 +1116,33 @@ GtkWidget* create_new_tab(GtkWidget* win, const std::string& url, WebKitWebConte
     }
 
     WebKitSettings *wk_settings = webkit_web_view_get_settings(WEBKIT_WEB_VIEW(view));
-    webkit_settings_set_enable_developer_extras(wk_settings, TRUE);
+    webkit_settings_set_enable_developer_extras(wk_settings, TRUE); // Required for F12 inspector
 
-    webkit_settings_set_enable_page_cache(wk_settings, FALSE); 
+    // Disable bfcache — keeps full page renders in memory for back/forward.
+    // Not worth the RAM cost for most browsing.
+    webkit_settings_set_enable_page_cache(wk_settings, FALSE);
 
     webkit_settings_set_enable_site_specific_quirks(wk_settings, FALSE);
-    
-    // may delete, ts for offline cache, 
-    // yeah i deleted to silence warning no need for it anyways
-    //webkit_settings_set_enable_offline_web_application_cache(wk_settings, FALSE);
-
 
     webkit_settings_set_enable_webgl(wk_settings, TRUE);
-    webkit_settings_set_enable_media_stream(wk_settings, TRUE);
+
+    // Don't hold camera/mic hardware open on every tab by default.
+    webkit_settings_set_enable_media_stream(wk_settings, FALSE);
+
     webkit_settings_set_enable_smooth_scrolling(wk_settings, TRUE);
 
-    //webkit_settings_set_hardware_acceleration_policy(wk_settings, WEBKIT_HARDWARE_ACCELERATION_POLICY_ALWAYS);
-    //webkit_settings_set_hardware_acceleration_policy(wk_settings, WEBKIT_HARDWARE_ACCELERATION_POLICY_ON_DEMAND);
-
+    // ON_DEMAND: GPU resources are only allocated when the page actually uses
+    // hardware acceleration (video, canvas, WebGL). ALWAYS wastes GPU memory
+    // on every plain text/HTML page. NEVER breaks YouTube. ON_DEMAND is the
+    // sweet spot — WebKit will still use the GPU for video automatically.
     if (settings.hardware_acceleration) {
-    webkit_settings_set_hardware_acceleration_policy(wk_settings, WEBKIT_HARDWARE_ACCELERATION_POLICY_ALWAYS);
+        webkit_settings_set_hardware_acceleration_policy(wk_settings, WEBKIT_HARDWARE_ACCELERATION_POLICY_ON_DEMAND);
     } else {
         webkit_settings_set_hardware_acceleration_policy(wk_settings, WEBKIT_HARDWARE_ACCELERATION_POLICY_NEVER);
     }
 
-    if (settings.cache_model == "document-viewer") {
-    webkit_web_context_set_cache_model(global_context, WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER);
-    } else {
-        webkit_web_context_set_cache_model(global_context, WEBKIT_CACHE_MODEL_WEB_BROWSER);
-    }
+    // Cache model is a context-level setting; it's already applied once at
+    // startup in main.cpp. Setting it here on every tab creation is redundant.
 
     g_signal_connect(view, "user-message-received", G_CALLBACK(on_user_message_received), NULL);
 
