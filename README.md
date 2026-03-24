@@ -16,9 +16,9 @@ Instead of relying on native toolkit widgets, Zyro renders its entire interface 
 ![Language](https://img.shields.io/badge/language-C%2B%2B-brightgreen)
 ![Engine](https://img.shields.io/badge/engine-WebKitGTK-orange)
 
-## ✨ Features
+## Features
 
-### 🛡️ Privacy & Security
+### Privacy & Security
 - **AdShield Blocker**  
   Built-in content filtering that blocks common trackers and ads (Google Analytics, DoubleClick, Facebook).
 
@@ -35,7 +35,7 @@ Instead of relying on native toolkit widgets, Zyro renders its entire interface 
 
 ---
 
-### ⚡ Performance & Resource Management
+### Performance & Resource Management
 - **Per-Tab Process Monitoring**  
   A built-in task manager shows PID and memory (RSS) usage for each tab.
 
@@ -49,7 +49,7 @@ Instead of relying on native toolkit widgets, Zyro renders its entire interface 
 
 ---
 
-### 🎨 User Experience
+### User Experience
 - **HTML-Based UI**  
   Navigation bars, settings, and the new tab page are all rendered as web content.
 
