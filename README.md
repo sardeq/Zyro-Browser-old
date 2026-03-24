@@ -81,44 +81,6 @@ Instead of relying on native toolkit widgets, Zyro renders its entire interface 
 - libsecret (Linux only)
 
 ---
-
-## 📥 Installation
-
-Choose the file format that matches your Linux distribution.
-
-### Option 1: Debian, Ubuntu, Linux Mint, Kali (.deb)
-*Best for most users on Debian-based systems.*
-
-1.  Download **`zyro_browser.deb`**.
-2.  Open your terminal in the folder where you downloaded the file.
-3.  Run the following command to install:
-    ```bash
-    sudo apt install ./zyro_browser.deb
-    ```
-4.  **Run it**: You can now find **Zyro Browser** in your application menu or run it by typing `zyro` in the terminal.
-
-> **Note**: If you get a "dependencies missing" error, run `sudo apt --fix-broken install` and try again.
-
-### Option 2: Portable Linux Package (.tar.gz)
-*Works on Arch Linux, Fedora, Void, Solus, etc.*
-
-1.  Download **`zyro-browser-linux.tar.gz`**.
-2.  Extract the archive:
-    ```bash
-    tar -xzvf zyro-browser-linux.tar.gz
-    ```
-3.  Enter the extracted folder:
-    ```bash
-    cd zyro-linux
-    ```
-4.  **Run it**:
-    ```bash
-    ./run.sh
-    ```
-    *(You can also double-click `run.sh` in your file manager if executable permissions are enabled).*
-
-**Windows soon i think**
----
 ## Build & Run
 
 ### Build steps
@@ -134,5 +96,3 @@ make
 ```bash
 ./ZyroBrowser
 ```
-
-*Note: I have no idea what Im doing, this probably will and does have many issues*
