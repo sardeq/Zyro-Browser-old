@@ -8,7 +8,7 @@ The main idea behind Zyro is simple: keep the browser fast and efficient while g
 
 Instead of relying on native toolkit widgets, Zyro renders its entire interface using **HTML, CSS, and JavaScript**. This makes theming, layout changes, and UI experiments much easier compared to traditional desktop browsers.
 
-> This project is still under active development and mainly serves as a learning and experimentation platform.
+> This project is still under active development and mainly serves as an experimentation platform.
 
 
 ![Version](https://img.shields.io/badge/version-0.0.1-blue)
@@ -69,8 +69,6 @@ Instead of relying on native toolkit widgets, Zyro renders its entire interface 
   The new tab page can show system stats (CPU/RAM), shortcuts, and custom backgrounds.
 
 ---
-
-## 🛠️ Build Requirements
 
 ### Dependencies
 - CMake (3.10+)
