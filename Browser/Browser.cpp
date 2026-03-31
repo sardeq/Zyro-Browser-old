@@ -74,6 +74,7 @@ void show_menu(GtkButton* btn, gpointer win);
 void on_url_activate(GtkEntry* e, gpointer view_ptr);
 static void on_url_changed(GtkEditable* editable, gpointer user_data);
 static GtkWidget* on_web_view_create(WebKitWebView* web_view, WebKitNavigationAction* navigation_action, gpointer user_data);
+static void on_media_btn_clicked(GtkButton* btn, gpointer);
 
 extern int get_blocked_count();
 
@@ -1131,6 +1132,9 @@ GtkWidget* create_new_tab(GtkWidget* win, const std::string& url, WebKitWebConte
 
     webkit_settings_set_enable_smooth_scrolling(wk_settings, TRUE);
 
+    // Suppress per-message stdout allocations; pages should use devtools, not stdout.
+    webkit_settings_set_enable_write_console_messages_to_stdout(wk_settings, FALSE);
+
     // ON_DEMAND: GPU resources are only allocated when the page actually uses
     // hardware acceleration (video, canvas, WebGL). ALWAYS wastes GPU memory
     // on every plain text/HTML page. NEVER breaks YouTube. ON_DEMAND is the
@@ -1140,9 +1144,6 @@ GtkWidget* create_new_tab(GtkWidget* win, const std::string& url, WebKitWebConte
     } else {
         webkit_settings_set_hardware_acceleration_policy(wk_settings, WEBKIT_HARDWARE_ACCELERATION_POLICY_NEVER);
     }
-
-    // Cache model is a context-level setting; it's already applied once at
-    // startup in main.cpp. Setting it here on every tab creation is redundant.
 
     g_signal_connect(view, "user-message-received", G_CALLBACK(on_user_message_received), NULL);
 
@@ -1163,7 +1164,8 @@ GtkWidget* create_new_tab(GtkWidget* win, const std::string& url, WebKitWebConte
     GtkWidget* b_menu = mkbtn("open-menu-symbolic", "Menu"); 
 
     GtkWidget* b_media = mkbtn("media-playback-start-symbolic", "Media Control");
-    create_media_player_popover(b_media);
+    // Connect to the singleton handler — no per-tab popover creation.
+    g_signal_connect(b_media, "clicked", G_CALLBACK(on_media_btn_clicked), NULL);
 
     GtkWidget* b_downloads = gtk_toggle_button_new(); 
     GtkWidget* dl_icon = gtk_image_new_from_icon_name("folder-download-symbolic", GTK_ICON_SIZE_BUTTON);
@@ -1610,9 +1612,6 @@ gboolean on_key_press(GtkWidget* widget, GdkEventKey* event, gpointer user_data)
     }
 
     return FALSE; 
-
-
-    return FALSE; 
 }
 void create_window(WebKitWebContext* ctx) {
     GtkWidget* win = gtk_window_new(GTK_WINDOW_TOPLEVEL);
@@ -1678,7 +1677,47 @@ void create_window(WebKitWebContext* ctx) {
     if (!webkit_web_context_is_ephemeral(ctx)) {
         g_timeout_add_seconds(10, auto_save_data, NULL); 
     }
-    
+
+    // -----------------------------------------------------------------------
+    // BACKGROUND TAB THROTTLING via the Page Visibility API.
+    //
+    // When WebKit renders a tab that isn't the active one, the GTK widget is
+    // still in the widget tree and the renderer process runs at full speed.
+    // Well-behaved pages (YouTube, SPAs, animated dashboards) listen for the
+    // standard 'visibilitychange' event and pause timers, animations, and
+    // preloads when hidden — but WebKit only fires this automatically on
+    // window minimise, not on notebook page switches.
+    //
+    // This signal fires the event manually so pages self-throttle the moment
+    // you switch away.  The active tab always gets 'visible'; every other tab
+    // gets 'hidden'.  We patch document.visibilityState to match so pages that
+    // read the property (not just listen to the event) also behave correctly.
+    // -----------------------------------------------------------------------
+    g_signal_connect(nb, "switch-page",
+        G_CALLBACK(+[](GtkNotebook* nb2, GtkWidget*, guint new_page, gpointer) {
+            int n = gtk_notebook_get_n_pages(nb2);
+            for (int i = 0; i < n; i++) {
+                GtkWidget* page = gtk_notebook_get_nth_page(nb2, i);
+                GList* children = gtk_container_get_children(GTK_CONTAINER(page));
+                for (GList* l = children; l; l = l->next) {
+                    if (WEBKIT_IS_WEB_VIEW(l->data)) {
+                        WebKitWebView* v = WEBKIT_WEB_VIEW(l->data);
+                        bool is_active = ((int)new_page == i);
+                        // Patch visibilityState so document.visibilityState
+                        // reads correctly, then fire the standard event.
+                        std::string js = is_active
+                            ? "Object.defineProperty(document,'visibilityState',{get:()=>'visible',configurable:true});"
+                              "document.dispatchEvent(new Event('visibilitychange'));"
+                            : "Object.defineProperty(document,'visibilityState',{get:()=>'hidden',configurable:true});"
+                              "document.dispatchEvent(new Event('visibilitychange'));";
+                        run_js(v, js);
+                        break;
+                    }
+                }
+                g_list_free(children);
+            }
+        }), NULL);
+
     gtk_widget_show_all(win);
     
     create_new_tab(win, settings.home_url, ctx);
@@ -1788,30 +1827,51 @@ void update_media_popup() {
     gtk_widget_show_all(global_media_list_box);
 }
 
-void create_media_player_popover(GtkWidget* btn) {
-    global_media_popover = gtk_popover_new(btn);
-    gtk_popover_set_position(GTK_POPOVER(global_media_popover), GTK_POS_BOTTOM);
+// ---------------------------------------------------------------------------
+// Media popover — SINGLETON.
+//
+// Previously create_media_player_popover() was called inside create_new_tab(),
+// creating a fresh GtkPopover widget for every tab and overwriting
+// global_media_popover each time.  This meant:
+//   a) N orphaned popovers (one per non-last tab) that the refresh timer
+//      could never see as visible, so live-updating was broken on all but
+//      the last-opened tab.
+//   b) Extra GTK widget allocation on every new tab.
+//
+// Fix: create the popover exactly once (lazily, on first click of any media
+// button), then re-parent it to whichever button was just clicked via
+// gtk_popover_set_relative_to().  Every tab's media button shares the one
+// global popover.
+// ---------------------------------------------------------------------------
+static void on_media_btn_clicked(GtkButton* btn, gpointer) {
+    if (!global_media_popover) {
+        // First ever click — build the popover widget tree once.
+        global_media_popover = gtk_popover_new(GTK_WIDGET(btn));
+        gtk_popover_set_position(GTK_POPOVER(global_media_popover), GTK_POS_BOTTOM);
+        g_object_add_weak_pointer(G_OBJECT(global_media_popover),
+                                  (gpointer*)&global_media_popover);
 
-    // When the popover is destroyed (tab closed), clear the global pointer
-    // so the refresh timer doesn't call gtk_widget_get_visible on dead memory.
-    g_object_add_weak_pointer(G_OBJECT(global_media_popover), (gpointer*)&global_media_popover);
-    
-    GtkWidget* outer_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
-    gtk_widget_set_size_request(outer_box, 300, 150); 
-    g_object_set(outer_box, "margin", 12, NULL);
-    
-    GtkWidget* title = gtk_label_new("<b>Global Media Control</b>");
-    gtk_label_set_use_markup(GTK_LABEL(title), TRUE);
-    
-    global_media_list_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
-    
-    gtk_box_pack_start(GTK_BOX(outer_box), title, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(outer_box), global_media_list_box, TRUE, TRUE, 0);
-    
-    gtk_container_add(GTK_CONTAINER(global_media_popover), outer_box);
-    
-    g_signal_connect(btn, "clicked", G_CALLBACK(+[](GtkButton*, gpointer){
-        update_media_popup();
-        gtk_popover_popup(GTK_POPOVER(global_media_popover));
-    }), NULL);
+        GtkWidget* outer_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+        gtk_widget_set_size_request(outer_box, 300, 150);
+        g_object_set(outer_box, "margin", 12, NULL);
+
+        GtkWidget* title = gtk_label_new("<b>Global Media Control</b>");
+        gtk_label_set_use_markup(GTK_LABEL(title), TRUE);
+
+        global_media_list_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+
+        gtk_box_pack_start(GTK_BOX(outer_box), title, FALSE, FALSE, 0);
+        gtk_box_pack_start(GTK_BOX(outer_box), global_media_list_box, TRUE, TRUE, 0);
+
+        gtk_container_add(GTK_CONTAINER(global_media_popover), outer_box);
+        gtk_widget_show_all(outer_box);
+    } else {
+        // Re-parent the existing popover to the button that was just clicked
+        // so the arrow points at the right toolbar.
+        gtk_popover_set_relative_to(GTK_POPOVER(global_media_popover),
+                                    GTK_WIDGET(btn));
+    }
+
+    update_media_popup();
+    gtk_popover_popup(GTK_POPOVER(global_media_popover));
 }

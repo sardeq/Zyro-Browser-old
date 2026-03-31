@@ -11,11 +11,15 @@
 #include <malloc.h>
 #endif
 
+void reset_security_and_exit();
 
 static gboolean memory_trim_timer(gpointer) {
 #ifdef __linux__
     malloc_trim(0);
 #endif
+    if (global_context) {
+        webkit_web_context_clear_cache(global_context);
+    }
     return TRUE; 
 }
 
@@ -61,6 +65,13 @@ static gboolean update_home_stats(gpointer data) {
 }
 
 int main(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "--reset-security") {
+            gtk_init(&argc, &argv);
+            reset_security_and_exit();
+        }
+    }
+
     gtk_init(&argc, &argv);
     
     std::string user_dir = get_user_data_dir();
@@ -68,7 +79,6 @@ int main(int argc, char** argv) {
     std::string data = user_dir + "data";
 
     load_data();
-
 
     init_security(); 
     init_blocker();
@@ -81,16 +91,20 @@ int main(int argc, char** argv) {
 
     global_context = webkit_web_context_new_with_website_data_manager(mgr);
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    webkit_web_context_set_process_model(
+        global_context,
+        WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS
+    );
+#pragma GCC diagnostic pop
+
     WebKitCacheModel model = (settings.cache_model == "web-browser") ? 
         WEBKIT_CACHE_MODEL_WEB_BROWSER : WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER;
     webkit_web_context_set_cache_model(global_context, model);
 
-
     std::string extension_dir = get_self_path() + "/lib";
     webkit_web_context_set_web_extensions_directory(global_context, extension_dir.c_str());
-
-    
-
 
     webkit_cookie_manager_set_persistent_storage(
         webkit_web_context_get_cookie_manager(global_context), 
@@ -98,17 +112,16 @@ int main(int argc, char** argv) {
         WEBKIT_COOKIE_PERSISTENT_STORAGE_SQLITE
     );
 
-
     create_window(global_context);
 
     g_timeout_add(500, refresh_download_popup_timer, NULL);
     g_signal_connect(global_context, "download-started", G_CALLBACK(on_download_started), NULL);
-    g_timeout_add(3000, update_home_stats, NULL);
 
-    g_timeout_add(1000, refresh_media_popup_timer, NULL);
+    g_timeout_add(5000, update_home_stats, NULL);
+    g_timeout_add(2000, refresh_media_popup_timer, NULL);
 
     if (settings.enable_memory_trim) {
-        g_timeout_add_seconds(15, memory_trim_timer, NULL);
+        g_timeout_add_seconds(10, memory_trim_timer, NULL);
     }
     
     gtk_main();
