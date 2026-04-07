@@ -16,6 +16,7 @@ Instead of relying on native toolkit widgets, Zyro renders its entire interface 
 ![Language](https://img.shields.io/badge/language-C%2B%2B-brightgreen)
 ![Engine](https://img.shields.io/badge/engine-WebKitGTK-orange)
 
+
 ## Features
 
 ### Privacy & Security
