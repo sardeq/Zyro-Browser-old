@@ -1,4 +1,4 @@
-![IMPORTANT] This project is no longer in development, I started it as a learning experience and to make a browser I can use in my day to day, my priority was always optimization however I reached a limit with GTK and I can't find a way to optimize it further, I will link the new repo soon.
+# This project is no longer in development, I started it as a learning experience and to make a browser I can use in my day to day, my priority was always optimization however I reached a limit with GTK and I can't find a way to optimize it further, I will link the new repo soon.
 
 # Zyro Browser
 
@@ -9,9 +9,6 @@
 The main idea behind Zyro is simple: keep the browser fast and efficient while giving full control over the UI.
 
 Instead of relying on native toolkit widgets, Zyro renders its entire interface using **HTML, CSS, and JavaScript**. This makes theming, layout changes, and UI experiments much easier compared to traditional desktop browsers.
-
-> This project is still under active development and mainly serves as an experimentation platform.
-
 
 ![Version](https://img.shields.io/badge/version-0.0.1-blue)
 ![Platform](https://img.shields.io/badge/platform-Linux-lightgrey)
