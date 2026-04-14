@@ -1,3 +1,5 @@
+[!IMPORTANT] This project is no longer in development, I started it as a learning experience and to make a browser I can use in my day to day, my priority was always optimization however I reached a limit with GTK and I can't find a way to optimize it further, I will link the new repo soon.
+
 # Zyro Browser
 
 <img src="assets/Images/logo_no_text.png" alt="Zyro Logo" width="150"/>

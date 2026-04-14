@@ -67,7 +67,6 @@ void load_session_into_memory() {
     }
 }
 
-// ----------------------------------
 
 void show_site_info_popover(GtkEntry* entry, WebKitWebView* view);
 void show_menu(GtkButton* btn, gpointer win);
@@ -229,6 +228,7 @@ void on_suggestion_ready(GObject* source, GAsyncResult* res, gpointer user_data)
         }
         
         // Only trigger the "popup" if it is an actual completion widget
+        // bit buggy
         if(GTK_IS_ENTRY_COMPLETION(req->target) && final_list.size() > 0) {
             gtk_entry_completion_complete(GTK_ENTRY_COMPLETION(req->target));
         }
